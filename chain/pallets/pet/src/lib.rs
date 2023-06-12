@@ -72,6 +72,7 @@ pub mod pallet {
 		NotAvailableToSave,
 		NotAvailableToForceSave,
 		OwnerShouldFeedPet,
+		LastFeedNotCleared,
 	}
 
 	#[pallet::call]
@@ -158,7 +159,10 @@ pub mod pallet {
 
 			pet.owner = sender.clone();
 			Pets::<T>::insert(id, pet);
-			LastFeedTime::<T>::remove(id, previous_pet_owner);
+
+			let res = LastFeedTime::<T>::clear_prefix(id, u32::MAX, None);
+			ensure!(res.maybe_cursor.is_none(), Error::<T>::LastFeedNotCleared);
+			LastFeedTime::<T>::insert(id, &sender, now);
 
 			Self::deposit_event(Event::PetForceSaved(sender, id));
 			Ok(().into())
