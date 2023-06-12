@@ -22,6 +22,9 @@ pub mod pallet {
 		type StringLimit: Get<u32>;
 	}
 
+	/// pet's age since created_time determines experience points
+	/// last_feed_time determines the hungry points
+	/// last_play_time determines the energy points
 	#[derive(
 		Clone, Encode, Decode, PartialEqNoBound, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen,
 	)]
@@ -30,9 +33,7 @@ pub mod pallet {
 		pub owner: T::AccountId,
 		pub name: BoundedVec<u8, T::StringLimit>,
 		pub species: Species,
-		// pub experience_points: u32,
-		// pub hungry_points: u32,
-		// pub energy_points: u32,
+		pub created_time: T::Moment,
 	}
 
 	#[derive(
@@ -77,6 +78,7 @@ pub mod pallet {
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
+		/// Mint a pet, we may want to make pet exist by born in the future
 		#[pallet::call_index(0)]
 		#[pallet::weight(0)]
 		pub fn mint_pet(
@@ -88,21 +90,21 @@ pub mod pallet {
 			let sender = ensure_signed(origin)?;
 			ensure!(!Pets::<T>::contains_key(id), Error::<T>::PetAlreadyExists);
 
+			let now = <pallet_timestamp::Pallet<T>>::get();
 			let pet = Pet {
 				owner: sender.clone(),
 				name,
 				species,
-				// experience_points: 1,
-				// hungry_points: 0,
-				// energy_points: 10,
+				created_time: now,
 			};
 			Pets::<T>::insert(id, pet);
-			LastFeedTime::<T>::insert(id, &sender, <pallet_timestamp::Pallet<T>>::get());
+			LastFeedTime::<T>::insert(id, &sender, now);
 
 			Self::deposit_event(Event::PetMinted(sender, id));
 			Ok(().into())
 		}
 
+		/// The owner can feed its pet.
 		#[pallet::call_index(1)]
 		#[pallet::weight(0)]
 		pub fn feed_pet(origin: OriginFor<T>, id: u32) -> DispatchResultWithPostInfo {
@@ -116,6 +118,8 @@ pub mod pallet {
 			Ok(().into())
 		}
 
+		/// The pet has been hungry for last 3 days
+		/// others can save the cat by feeding it.
 		#[pallet::call_index(2)]
 		#[pallet::weight(0)]
 		pub fn save_pet(origin: OriginFor<T>, id: u32) -> DispatchResultWithPostInfo {
@@ -139,6 +143,9 @@ pub mod pallet {
 			Ok(().into())
 		}
 
+		/// The previous owner stops feeding the pet for a long time
+		/// the saver has active feeding the pet in last 3 days
+		/// the save can own the cat without agree from its previous owner
 		#[pallet::call_index(3)]
 		#[pallet::weight(0)]
 		pub fn save_pet_by_force(origin: OriginFor<T>, id: u32) -> DispatchResultWithPostInfo {
